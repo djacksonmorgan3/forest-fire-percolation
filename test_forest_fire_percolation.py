@@ -1,6 +1,8 @@
 import unittest
+import numpy as np
 from forest_fire_percolation import (
-    Forest, make_densities, wilson_interval, estimate_empirical_threshold
+    Forest, make_densities, wilson_interval, estimate_empirical_threshold,
+    evaluate_unseen_densities
 )
 
 
@@ -39,6 +41,19 @@ class ForestSearchTests(unittest.TestCase):
             {"density": 0.6, "dfs_probability": 0.8},
         ]
         self.assertAlmostEqual(estimate_empirical_threshold(records), 0.5)
+
+
+    def test_unseen_density_evaluation_holds_out_levels(self):
+        rows = []
+        for density in np.linspace(0, 1, 11):
+            for outcome in ([0] * 8 + [1] * 2 if density < 0.5 else [0] * 2 + [1] * 8):
+                rows.append((float(density), outcome))
+        metrics = evaluate_unseen_densities(rows, seed=42, holdout_every=3)
+        self.assertGreater(metrics["train_rows"], 0)
+        self.assertGreater(metrics["test_rows"], 0)
+        self.assertGreater(metrics["held_out_density_levels"], 0)
+        self.assertGreaterEqual(metrics["accuracy"], 0.0)
+        self.assertLessEqual(metrics["accuracy"], 1.0)
 
 
 if __name__ == "__main__":

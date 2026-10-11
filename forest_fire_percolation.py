@@ -166,6 +166,49 @@ def fit_model(trial_rows, seed=42):
     return model, metrics
 
 
+def calculate_metrics(y_true, probabilities):
+    """Calculate classification and probability metrics from predicted probabilities."""
+    predictions = (probabilities >= 0.5).astype(int)
+    metrics = {
+        "test_rows": int(len(y_true)),
+        "accuracy": accuracy_score(y_true, predictions),
+        "brier_score": brier_score_loss(y_true, probabilities),
+    }
+    if len(np.unique(y_true)) == 2:
+        metrics["roc_auc"] = roc_auc_score(y_true, probabilities)
+    else:
+        metrics["roc_auc"] = float("nan")
+    return metrics
+
+
+def evaluate_unseen_densities(trial_rows, seed=42, holdout_every=5):
+    """Train on most density levels and evaluate only on entirely held-out levels."""
+    X = np.array([row[0] for row in trial_rows], dtype=float)
+    y = np.array([row[1] for row in trial_rows], dtype=int)
+    unique_densities = np.unique(X)
+    if len(unique_densities) < holdout_every + 2:
+        raise ValueError("Not enough density levels for unseen-density evaluation.")
+
+    held_out_densities = set(unique_densities[::holdout_every].tolist())
+    test_mask = np.array([density in held_out_densities for density in X])
+    train_mask = ~test_mask
+
+    if len(np.unique(y[train_mask])) < 2:
+        raise ValueError("Training data has only one outcome class; cannot fit logistic regression.")
+    if not np.any(test_mask):
+        raise ValueError("The unseen-density test set is empty.")
+
+    model = LogisticRegression(max_iter=1000, random_state=seed)
+    model.fit(X[train_mask].reshape(-1, 1), y[train_mask])
+    probabilities = model.predict_proba(X[test_mask].reshape(-1, 1))[:, 1]
+    metrics = calculate_metrics(y[test_mask], probabilities)
+    metrics["train_rows"] = int(train_mask.sum())
+    metrics["held_out_density_levels"] = len(held_out_densities)
+    metrics["held_out_density_min"] = float(min(held_out_densities))
+    metrics["held_out_density_max"] = float(max(held_out_densities))
+    return metrics
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trials", type=int, default=1000, help="Trials per density (default 1000)")
@@ -181,6 +224,7 @@ def main():
         args.trials, args.height, args.width, args.step, args.seed
     )
     model, metrics = fit_model(trial_rows, args.seed)
+    unseen_metrics = evaluate_unseen_densities(trial_rows, args.seed)
     empirical_threshold = estimate_empirical_threshold(records)
     logistic_threshold = (
         -metrics["intercept"] / metrics["density_coefficient"]
@@ -229,6 +273,18 @@ def main():
     print(f"Density coefficient: {metrics['density_coefficient']:.3f}")
     print(f"Empirical 50% spread threshold (interpolated): {empirical_threshold:.3f}")
     print(f"Logistic regression 50% threshold: {logistic_threshold:.3f}")
+    print("\nUnseen-density evaluation (entire density levels held out)")
+    print(f"Training rows: {unseen_metrics['train_rows']}")
+    print(f"Test rows: {unseen_metrics['test_rows']}")
+    print(f"Held-out density levels: {unseen_metrics['held_out_density_levels']}")
+    print(
+        "Held-out density range: "
+        f"{unseen_metrics['held_out_density_min']:.2f} to "
+        f"{unseen_metrics['held_out_density_max']:.2f}"
+    )
+    print(f"Accuracy: {unseen_metrics['accuracy']:.3f}")
+    print(f"ROC AUC: {unseen_metrics['roc_auc']:.3f}")
+    print(f"Brier score: {unseen_metrics['brier_score']:.3f}")
     print(f"Saved results: {csv_path}")
     print(f"Saved plot: {plot_path}")
     print("These metrics evaluate predictions of simulated outcomes, not real-world fires.")

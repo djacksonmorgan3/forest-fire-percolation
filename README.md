@@ -43,19 +43,14 @@ python forest_fire_percolation.py --trials 100 --step 0.02 --seed 42
 
 Options: `--trials`, `--height`, `--width`, `--step`, `--seed`, and `--output-dir`. The step must divide evenly into 1.0.
 
+## Output
+- `results/forest_fire_simulation_results.csv`
+- `results/forest_fire_logistic_regression.png`
+
 ## Interpretation and limitations
 Logistic regression estimates the probability of fire spreading from density. It does not replace DFS/BFS and does not predict an exact fire path. The model is trained and evaluated on simulated outcomes, so its metrics describe this simulation—not real-world fire behavior. The simulation uses four-directional movement only and does not model wind, moisture, terrain, or tree species.
-## Simulation Results
 
-The figure below shows the observed fire-spread probabilities across forest densities, with 95% Wilson confidence intervals, alongside the logistic regression estimate.
 
-![Forest fire simulation results with confidence intervals](images/forest_fire_logistic_regression.png)
+## Generalization to Unseen Density Levels
 
-The estimated 50% spread threshold was approximately **0.590** for both the empirical interpolation and logistic regression model in this simulation run.
-
-These are results from simulated forests, not real-world wildfire observations.
-
-### Output Files
-
-- `results/forest_fire_simulation_results.csv` — simulation probabilities and confidence interval bounds.
-- `results/forest_fire_logistic_regression.png` — generated simulation graph.
+In addition to a random trial-level split, the program holds out complete density levels and evaluates logistic regression on those levels. This tests prediction at density values that were not used for training, while keeping the held-out levels within the overall simulated density range. Results still describe this simulated setup, not real-world wildfire behavior.
