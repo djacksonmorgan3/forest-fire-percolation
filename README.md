@@ -54,3 +54,18 @@ Logistic regression estimates the probability of fire spreading from density. It
 ## Generalization to Unseen Density Levels
 
 In addition to a random trial-level split, the program holds out complete density levels and evaluates logistic regression on those levels. This tests prediction at density values that were not used for training, while keeping the held-out levels within the overall simulated density range. Results still describe this simulated setup, not real-world wildfire behavior.
+## Model Evaluation
+
+The logistic regression model was evaluated on simulated forest outcomes using both a random trial-level split and a separate evaluation that held out entire density levels.
+
+| Metric | Random Split | Unseen-Density Evaluation |
+|---|---:|---:|
+| Accuracy | 95.6% | 95.8% |
+| ROC AUC | 0.994 | 0.994 |
+| Brier Score | 0.031 | 0.030 |
+
+The unseen-density evaluation held out 21 density levels, representing 21,000 simulated forests, while training used 80,000 simulated forests. The held-out density levels ranged from 0.00 to 1.00.
+
+Both evaluations produced similar metrics, suggesting that the model performs consistently across the tested density levels in this simulated environment. These results do not establish predictive performance on real-world wildfires.
+
+**Estimated 50% spread threshold:** 0.590 using both empirical interpolation and logistic regression, rounded to three decimal places.
