@@ -270,9 +270,17 @@ def main():
     plt.plot([r["density"] for r in records], [r["bfs_probability"] for r in records],
              "--", linewidth=1.5, label="Observed simulation rate (BFS)")
     plt.plot(x.ravel(), y, linewidth=2.5, label="Logistic regression estimate")
+    baseline_probability = unseen_metrics["training_prevalence"]
+
+    plt.axhline(
+    y=baseline_probability,
+    linestyle=":",
+    linewidth=2,
+    label=f"Baseline probability ({baseline_probability:.3f})"
+)
     plt.xlabel("Forest density")
     plt.ylabel("Probability fire reaches the bottom")
-    plt.title("Forest Fire Percolation: Simulation vs. Logistic Regression")
+    plt.title("Forest Fire Percolation: Model vs. Baseline")
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.grid(alpha=0.25)
