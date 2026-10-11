@@ -49,7 +49,13 @@ Options: `--trials`, `--height`, `--width`, `--step`, `--seed`, and `--output-di
 
 ## Interpretation and limitations
 Logistic regression estimates the probability of fire spreading from density. It does not replace DFS/BFS and does not predict an exact fire path. The model is trained and evaluated on simulated outcomes, so its metrics describe this simulation—not real-world fire behavior. The simulation uses four-directional movement only and does not model wind, moisture, terrain, or tree species.
+## Simulation Results
 
+The graph compares observed fire-spread rates from repeated simulated forests with the probabilities estimated by logistic regression. The horizontal baseline represents the training-set spread prevalence, regardless of forest density.
+
+![Forest fire percolation simulation comparing observed spread rates, logistic regression estimates, and the baseline probability](images/forest_fire_logistic_regression.png)
+
+All results come from simulated forests, not real-world wildfire observations.
 
 ## Generalization to Unseen Density Levels
 
