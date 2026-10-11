@@ -200,8 +200,26 @@ def evaluate_unseen_densities(trial_rows, seed=42, holdout_every=5):
 
     model = LogisticRegression(max_iter=1000, random_state=seed)
     model.fit(X[train_mask].reshape(-1, 1), y[train_mask])
-    probabilities = model.predict_proba(X[test_mask].reshape(-1, 1))[:, 1]
-    metrics = calculate_metrics(y[test_mask], probabilities)
+    test_X = X[test_mask].reshape(-1, 1)
+    y_test = y[test_mask]
+    probabilities = model.predict_proba(test_X)[:, 1]
+    metrics = calculate_metrics(y_test, probabilities)
+
+    # Baseline probability is the training-set prevalence. Its class prediction
+    # is the majority class in the training data (0 on an exact tie).
+    training_prevalence = float(np.mean(y[train_mask]))
+    baseline_probabilities = np.full(len(y_test), training_prevalence, dtype=float)
+    baseline_predictions = np.full(
+        len(y_test), int(training_prevalence > 0.5), dtype=int
+    )
+    metrics["baseline_accuracy"] = accuracy_score(y_test, baseline_predictions)
+    metrics["baseline_brier_score"] = brier_score_loss(y_test, baseline_probabilities)
+    if len(np.unique(y_test)) == 2:
+        metrics["baseline_roc_auc"] = 0.5
+    else:
+        metrics["baseline_roc_auc"] = float("nan")
+
+    metrics["training_prevalence"] = training_prevalence
     metrics["train_rows"] = int(train_mask.sum())
     metrics["held_out_density_levels"] = len(held_out_densities)
     metrics["held_out_density_min"] = float(min(held_out_densities))
@@ -282,9 +300,13 @@ def main():
         f"{unseen_metrics['held_out_density_min']:.2f} to "
         f"{unseen_metrics['held_out_density_max']:.2f}"
     )
-    print(f"Accuracy: {unseen_metrics['accuracy']:.3f}")
-    print(f"ROC AUC: {unseen_metrics['roc_auc']:.3f}")
-    print(f"Brier score: {unseen_metrics['brier_score']:.3f}")
+    print(f"Logistic regression accuracy: {unseen_metrics['accuracy']:.3f}")
+    print(f"Logistic regression ROC AUC: {unseen_metrics['roc_auc']:.3f}")
+    print(f"Logistic regression Brier score: {unseen_metrics['brier_score']:.3f}")
+    print(f"Baseline accuracy: {unseen_metrics['baseline_accuracy']:.3f}")
+    print(f"Baseline ROC AUC: {unseen_metrics['baseline_roc_auc']:.3f}")
+    print(f"Baseline Brier score: {unseen_metrics['baseline_brier_score']:.3f}")
+    print(f"Training-set spread prevalence: {unseen_metrics['training_prevalence']:.3f}")
     print(f"Saved results: {csv_path}")
     print(f"Saved plot: {plot_path}")
     print("These metrics evaluate predictions of simulated outcomes, not real-world fires.")

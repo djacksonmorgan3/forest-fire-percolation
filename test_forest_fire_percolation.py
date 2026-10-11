@@ -54,6 +54,11 @@ class ForestSearchTests(unittest.TestCase):
         self.assertGreater(metrics["held_out_density_levels"], 0)
         self.assertGreaterEqual(metrics["accuracy"], 0.0)
         self.assertLessEqual(metrics["accuracy"], 1.0)
+        self.assertGreaterEqual(metrics["baseline_accuracy"], 0.0)
+        self.assertLessEqual(metrics["baseline_accuracy"], 1.0)
+        self.assertGreaterEqual(metrics["baseline_brier_score"], 0.0)
+        self.assertLessEqual(metrics["baseline_brier_score"], 1.0)
+        self.assertAlmostEqual(metrics["baseline_roc_auc"], 0.5)
 
 
 if __name__ == "__main__":
