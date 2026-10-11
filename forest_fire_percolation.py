@@ -78,6 +78,39 @@ def make_densities(step):
     return np.linspace(0, 1, count + 1)
 
 
+def wilson_interval(successes, trials, z=1.96):
+    """Return a 95% Wilson confidence interval for a binomial proportion."""
+    if trials < 1:
+        raise ValueError("Trials must be at least 1.")
+    p_hat = successes / trials
+    z2 = z * z
+    denominator = 1 + z2 / trials
+    center = (p_hat + z2 / (2 * trials)) / denominator
+    margin = (
+        z
+        * ((p_hat * (1 - p_hat) / trials + z2 / (4 * trials * trials)) ** 0.5)
+        / denominator
+    )
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def estimate_empirical_threshold(records):
+    """Linearly interpolate the density where observed spread probability crosses 0.5."""
+    ordered = sorted(records, key=lambda record: record["density"])
+    for left, right in zip(ordered, ordered[1:]):
+        p_left = left["dfs_probability"]
+        p_right = right["dfs_probability"]
+        if p_left == 0.5:
+            return left["density"]
+        if (p_left < 0.5 <= p_right) or (p_left > 0.5 >= p_right):
+            if p_right == p_left:
+                return (left["density"] + right["density"]) / 2
+            fraction = (0.5 - p_left) / (p_right - p_left)
+            return left["density"] + fraction * (right["density"] - left["density"])
+    # If no observed crossing occurs, return the nearest observed density as a fallback.
+    return min(ordered, key=lambda record: abs(record["dfs_probability"] - 0.5))["density"]
+
+
 def run_simulation(trials=1000, height=20, width=20, step=0.01, seed=42):
     """Run independent trials at every density and return aggregated results."""
     if trials < 1:
@@ -102,6 +135,8 @@ def run_simulation(trials=1000, height=20, width=20, step=0.01, seed=42):
             "bfs_successes": bfs_count,
             "dfs_probability": dfs_count / trials,
             "bfs_probability": bfs_count / trials,
+            "dfs_ci_lower": wilson_interval(dfs_count, trials)[0],
+            "dfs_ci_upper": wilson_interval(dfs_count, trials)[1],
         })
         print(f"density={density:.2f} DFS={dfs_count}/{trials} ({dfs_count/trials:.3f})")
     return records, trial_rows
@@ -146,6 +181,12 @@ def main():
         args.trials, args.height, args.width, args.step, args.seed
     )
     model, metrics = fit_model(trial_rows, args.seed)
+    empirical_threshold = estimate_empirical_threshold(records)
+    logistic_threshold = (
+        -metrics["intercept"] / metrics["density_coefficient"]
+        if metrics["density_coefficient"] != 0
+        else float("nan")
+    )
 
     csv_path = args.output_dir / "forest_fire_simulation_results.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as f:
@@ -153,13 +194,19 @@ def main():
         writer.writeheader()
         writer.writerows(records)
 
+    densities = np.array([r["density"] for r in records])
+    dfs_rates = np.array([r["dfs_probability"] for r in records])
     x = np.linspace(0, 1, 500).reshape(-1, 1)
     y = model.predict_proba(x)[:, 1]
     plt.figure(figsize=(10, 6))
-    plt.plot([r["density"] for r in records], [r["dfs_probability"] for r in records],
-             "o", markersize=3, label="Observed simulation rate (DFS)")
+    lower_errors = dfs_rates - np.array([r["dfs_ci_lower"] for r in records])
+    upper_errors = np.array([r["dfs_ci_upper"] for r in records]) - dfs_rates
+    plt.errorbar(
+        densities, dfs_rates, yerr=np.vstack((lower_errors, upper_errors)),
+        fmt="o", markersize=3, capsize=2, label="Observed rate (DFS, 95% Wilson CI)"
+    )
     plt.plot([r["density"] for r in records], [r["bfs_probability"] for r in records],
-             "--", label="Observed simulation rate (BFS)")
+             "--", linewidth=1.5, label="Observed simulation rate (BFS)")
     plt.plot(x.ravel(), y, linewidth=2.5, label="Logistic regression estimate")
     plt.xlabel("Forest density")
     plt.ylabel("Probability fire reaches the bottom")
@@ -180,6 +227,8 @@ def main():
     print(f"Brier score: {metrics['brier_score']:.3f}")
     print(f"Intercept: {metrics['intercept']:.3f}")
     print(f"Density coefficient: {metrics['density_coefficient']:.3f}")
+    print(f"Empirical 50% spread threshold (interpolated): {empirical_threshold:.3f}")
+    print(f"Logistic regression 50% threshold: {logistic_threshold:.3f}")
     print(f"Saved results: {csv_path}")
     print(f"Saved plot: {plot_path}")
     print("These metrics evaluate predictions of simulated outcomes, not real-world fires.")
